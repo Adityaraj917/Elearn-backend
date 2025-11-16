@@ -28,9 +28,11 @@ app.use(
   cors({
     origin: [
       'http://localhost:3000',
-      'https://elearn-frontend-eight.vercel.app',
-      'https://elearn-frontend-8j33o70xr-adityas-projects-e8701faa.vercel.app'
+
+      // Allow all your Vercel deployments
+      /^https:\/\/.*\.vercel\.app$/,
     ],
+
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type'],
     credentials: true,
