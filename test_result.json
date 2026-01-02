@@ -1,0 +1,10 @@
+{
+  "summaryShort": "Artificial intelligence (AI) refers to the intelligence demonstrated by machines, which is different from the natural intelligence we see in humans and animals. The study of AI focuses heavily on understanding \"intelligent agents.\" These agents are systems designed to perceive their environment and then take the best possible actions to successfully reach their set goals.",
+  "summaryLong": "Artificial intelligence, or AI, is essentially the study of how machines can show intelligence, contrasting with the natural intelligence found in living creatures like animals and humans. AI research defines its field by focusing on the concept of \"intelligent agents.\" An intelligent agent is any type of system that has the ability to observe and understand its surrounding environment. Crucially, the agent then uses that perception to choose actions that will maximize its chances of achieving specific, assigned objectives.",
+  "keyPoints": [
+    "AI is machine intelligence, unlike the natural intelligence of animals and humans.",
+    "AI research is defined as the study of intelligent agents.",
+    "An intelligent agent is a system that observes its surroundings.",
+    "Agents take actions designed to maximize their goal achievement."
+  ]
+}

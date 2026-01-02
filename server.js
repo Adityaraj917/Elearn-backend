@@ -13,6 +13,7 @@ import { quizHandler, exportQuizHandler } from './controllers/quizController.js'
 import chatRoutes from './routes/chatRoutes.js';
 
 dotenv.config();
+console.log("Gemini Key Loaded:", !!process.env.GEMINI_API_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 4000;
