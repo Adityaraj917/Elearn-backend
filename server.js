@@ -10,7 +10,11 @@ import multer from 'multer';
 import { uploadHandlerFactory } from './controllers/uploadController.js';
 import { summarizeHandler } from './controllers/summarizeController.js';
 import { quizHandler, exportQuizHandler } from './controllers/quizController.js';
-import chatRoutes from './routes/chatRoutes.js';
+import { handleChat, handleAgentChat } from './controllers/chatController.js';
+import { nextQuestionHandler, analyzeProfileHandler } from './controllers/onboardingController.js';
+import { generateTestHandler, evaluateTestHandler } from './controllers/skillTestController.js';
+import { careerFitHandler } from './controllers/careerController.js';
+import { generateCareerSuggestions } from './services/aiService.js';
 
 dotenv.config();
 console.log("Gemini Key Loaded:", !!process.env.GEMINI_API_KEY);
@@ -24,16 +28,13 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-// ---------- FIXED CORS FOR RENDER + VERCEL ----------
+// ---------- CORS ----------
 app.use(
   cors({
     origin: [
       'http://localhost:3000',
-
-      // Allow all your Vercel deployments
       /^https:\/\/.*\.vercel\.app$/,
     ],
-
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type'],
     credentials: true,
@@ -70,11 +71,38 @@ const upload = multer({
 });
 
 // ---------- ROUTES ----------
+
+// File Upload
 app.post('/api/upload', upload.single('file'), uploadHandlerFactory(UPLOAD_DIR));
+
+// AI - Summarize, Quiz, Chat (connected to Gemini)
 app.post('/api/summarize', summarizeHandler);
 app.post('/api/quiz', quizHandler);
 app.get('/api/quiz/:fileId/export', exportQuizHandler);
-app.use('/api/chat', chatRoutes);
+app.post('/api/chat', (req, res) => handleChat(req, res));
+
+// Unified Agent Endpoint
+app.post('/api/agent', (req, res) => handleAgentChat(req, res));
+
+// Onboarding - Adaptive Questions
+app.post('/api/onboarding/next-question', nextQuestionHandler);
+app.post('/api/onboarding/analyze-profile', analyzeProfileHandler);
+
+// Skill Tests
+app.post('/api/skill-test/generate', generateTestHandler);
+app.post('/api/skill-test/evaluate', evaluateTestHandler);
+
+// Career
+app.post('/api/career/fit-score', careerFitHandler);
+app.post('/api/career/suggestions', async (req, res) => {
+  try {
+    const { subject, studentProfile } = req.body || {};
+    const data = await generateCareerSuggestions(subject || 'General', studentProfile);
+    return res.json(data);
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'Career suggestions failed' });
+  }
+});
 
 // ---------- HEALTH ----------
 app.get('/health', (req, res) => res.json({ ok: true }));

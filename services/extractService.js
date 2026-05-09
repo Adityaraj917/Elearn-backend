@@ -14,9 +14,9 @@ export async function extractText(filePath, mimeType) {
     if (mimeType === 'application/pdf' || ext === '.pdf') {
       const buff = await fs.readFile(filePath);
       const data = await pdfParse(buff).catch(() => ({ text: '' }));
-      text = (data.text || '').replace(/\s+$/g, '').trim();
-      if (!text || text.replace(/\s/g, '').length < 50) {
-        return { success: false, text: '', snippet: '', reason: 'Likely scanned or image-only PDF' };
+      text = cleanExtractedText(data.text || '');
+      if (!text || text.replace(/\s/g, '').length < 80) {
+        return { success: false, text: '', snippet: '', quality: 'none', reason: 'Likely scanned or image-only PDF. Please use a text-based PDF.' };
       }
     } else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
@@ -24,29 +24,50 @@ export async function extractText(filePath, mimeType) {
     ) {
       const buff = await fs.readFile(filePath);
       const { value } = await mammoth.extractRawText({ buffer: buff });
-      text = (value || '').trim();
+      text = cleanExtractedText(value || '');
     } else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
       ext === '.pptx'
     ) {
       text = await extractFromPPTX(filePath);
+      text = cleanExtractedText(text);
     } else if (mimeType === 'text/plain' || ext === '.txt') {
-      text = (await fs.readFile(filePath, 'utf-8')).toString().trim();
+      text = cleanExtractedText((await fs.readFile(filePath, 'utf-8')).toString());
     } else {
-      return { success: false, text: '', snippet: '', reason: 'Unsupported type' };
+      return { success: false, text: '', snippet: '', quality: 'none', reason: 'Unsupported file type. Supports: PDF, DOCX, PPTX, TXT.' };
     }
 
-    const cleaned = (text || '').replace(/\u0000/g, '').trim();
-    const snippet = cleaned.slice(0, 300);
-    const success = cleaned.length > 0;
-    return { success, text: cleaned, snippet };
+    const snippet = text.slice(0, 300);
+    const success = text.length > 0;
+    const quality = text.length > 2000 ? 'high' : text.length > 500 ? 'medium' : text.length > 100 ? 'low' : 'very_low';
+
+    return { success, text, snippet, quality, charCount: text.length };
   } catch (err) {
-    return { success: false, text: '', snippet: '', reason: err.message };
+    return { success: false, text: '', snippet: '', quality: 'none', reason: err.message };
   }
 }
 
+/** Clean extracted text: normalize whitespace, remove artifacts */
+function cleanExtractedText(raw) {
+  if (!raw) return '';
+  let text = raw;
+  // Remove null bytes
+  text = text.replace(/\u0000/g, '');
+  // Normalize unicode quotes and dashes
+  text = text.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, '-');
+  // Remove page number patterns (e.g., "Page 1 of 10", "- 3 -", standalone numbers on lines)
+  text = text.replace(/^Page\s+\d+\s*(of\s+\d+)?\s*$/gim, '');
+  text = text.replace(/^-\s*\d+\s*-\s*$/gm, '');
+  text = text.replace(/^\s*\d+\s*$/gm, '');
+  // Remove excessive whitespace but preserve paragraph breaks
+  text = text.replace(/[ \t]+/g, ' ');
+  text = text.replace(/\n{3,}/g, '\n\n');
+  // Trim each line
+  text = text.split('\n').map(line => line.trim()).filter(line => line.length > 0).join('\n');
+  return text.trim();
+}
+
 async function extractFromPPTX(filePath) {
-  // Best-effort: unzip pptx and read slides XML texts
   try {
     const zipStream = fsSync.createReadStream(filePath).pipe(unzipper.Parse({ forceStream: true }));
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', textNodeName: 't', ignoreDeclaration: true });
@@ -56,7 +77,6 @@ async function extractFromPPTX(filePath) {
       if (/ppt\/slides\/slide\d+\.xml$/.test(fileName)) {
         const content = await entry.buffer();
         const xml = parser.parse(content.toString());
-        // Traverse a:t text nodes (PowerPoint stores text in a:t)
         const t = collectText(xml);
         if (t) texts.push(t);
       } else {

@@ -3,14 +3,13 @@ import { generateQuiz } from '../services/aiService.js';
 import { questionsToCSV, questionsToJSON } from '../services/exportService.js';
 
 // In-memory cache of last generated quizzes per file
-const quizCache = new Map(); // key: fileId, value: { questions }
+const quizCache = new Map();
 
 export async function quizHandler(req, res) {
   try {
     const { fileId, options = {}, difficulty, count, numQuestions } = req.body || {};
     const forceMock = req.query.mock === 'true';
 
-    // Backward compatibility with current frontend which posts { difficulty, count }
     const opts = {
       difficulty: options.difficulty || difficulty || 'medium',
       numQuestions: options.numQuestions || count || numQuestions || 10,
@@ -19,21 +18,33 @@ export async function quizHandler(req, res) {
     let text = '';
     if (fileId) {
       const meta = getFileMeta(fileId);
-      if (!meta) return res.status(404).json({ error: 'File not found' });
+      if (!meta) return res.status(404).json({ error: 'File not found. Please re-upload your document.' });
       text = meta.text || '';
-      if (!text) return res.status(400).json({ error: 'No extractable text for this file (likely scanned/image-only). Try another file.' });
+      if (!text || text.trim().length < 50) {
+        return res.status(400).json({
+          error: 'Not enough text could be extracted from this file. Please try a different document (text-based PDF, DOCX, or TXT).'
+        });
+      }
     } else {
-      text = 'This is a generic study text used for mock quiz generation because no fileId was provided.';
+      // No fileId — still allow real AI quiz on a general topic
+      text = 'Generate general knowledge questions suitable for school students.';
     }
 
-    const data = await generateQuiz(text, opts, forceMock || !fileId);
+    // Always use real Gemini — never force mock
+    const data = await generateQuiz(text, opts, false);
 
-    // cache by fileId if present
+    // Validate we got usable questions
+    if (!data?.questions || data.questions.length === 0) {
+      return res.status(500).json({
+        error: 'Quiz generation failed. The AI could not generate valid questions. Please try again.'
+      });
+    }
+
     if (fileId) quizCache.set(fileId, data);
-
     return res.json(data);
   } catch (e) {
-    return res.status(500).json({ error: e.message || 'Quiz generation failed' });
+    console.error('Quiz handler error:', e);
+    return res.status(500).json({ error: 'Quiz generation failed. Please try again.' });
   }
 }
 
