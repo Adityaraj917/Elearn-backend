@@ -4,7 +4,7 @@ import { buildAgentPrompt } from './agentOrchestrator.js';
 
 dotenv.config();
 
-const geminiKey = process.env.GEMINI_API_KEY;
+const geminiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : undefined;
 const genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
 
 // ══════════════════════════════════════════════════════
@@ -106,6 +106,7 @@ function safeJsonParse(text, fallback = {}) {
 // ══════════════════════════════════════════════════════
 async function callGeminiRaw(prompt) {
   if (!genAI) return null;
+  let lastError = null;
 
   for (const modelName of MODEL_CHAIN) {
     const m = getModel(modelName);
@@ -119,6 +120,7 @@ async function callGeminiRaw(prompt) {
         console.log(`[Gemini] ✅ ${modelName} success (${text?.length || 0} chars)`);
         return text;
       } catch (error) {
+        lastError = error;
         const msg = error.message || '';
         const isQuota = error.status === 429 || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota');
         console.warn(`[Gemini] ❌ ${modelName} attempt ${attempt + 1}: ${isQuota ? 'QUOTA' : 'ERROR'} - ${msg.slice(0, 100)}`);
@@ -135,8 +137,8 @@ async function callGeminiRaw(prompt) {
     console.log(`[Gemini] Moving to next model in fallback chain...`);
   }
 
-  console.error('[Gemini] All models exhausted. No response.');
-  return null;
+  console.error('[Gemini] All models exhausted. Last error:', lastError?.message);
+  throw new Error(`Gemini API Error: ${lastError?.message || 'All models failed'}`);
 }
 
 /** Queued + cached call */
