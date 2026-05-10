@@ -11,11 +11,12 @@ const genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
 // MODEL FALLBACK CHAIN — each model has separate quota
 // ══════════════════════════════════════════════════════
 const MODEL_CHAIN = [
-  'gemini-2.5-flash-lite',
-  'gemini-2.0-flash-lite',
   'gemini-2.5-flash',
   'gemini-2.0-flash',
-  'gemini-1.5-flash'
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-flash-latest',
+  'gemini-flash-latest'
 ];
 
 function getModel(name) {
