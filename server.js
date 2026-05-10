@@ -114,9 +114,9 @@ app.get('/env-check', (req, res) => res.json({
 }));
 
 // ---------- START ----------
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Backend running at http://localhost:${PORT}`);
+if (process.env.NODE_ENV !== 'production' || process.env.RENDER || !process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Backend running on port ${PORT}`);
   });
 }
 
